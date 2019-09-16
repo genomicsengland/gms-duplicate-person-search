@@ -1,0 +1,51 @@
+---
+title: ""
+author: "Simon Thompson"
+output:
+   html_document
+---
+
+```{r setup, include = FALSE}
+
+library(knitr)
+library(ggplot2)
+
+```
+
+# Initial processing
+
+```{r deduplication-processing}
+
+e <- rl_dedup(d, id = id_vec, bf = bf_list, excl = excl_list, threshold)
+
+```
+
+# Analysis
+
+```{r table-of-prediction}
+
+table(e$prediction)
+
+```
+
+```{r hist-of-weights}
+
+ggplot(data.frame('Wdata' = e$Wdata, "prediction" = e$prediction), aes(x = Wdata, fill = prediction)) + 
+	geom_histogram() + 
+	geom_vline(xintercept = threshold)
+
+```
+
+# Export
+
+```{r export-dedup}
+
+f <- generate_link_participant_table(e, participant_detail_cols)
+
+if(export){
+	tstmp <- format(Sys.time(), '%Y%m%d-%H%m')
+	fn <- paste0('dedup-list-', tstmp, '.csv')
+	write.csv(f, fn)
+}
+
+```
