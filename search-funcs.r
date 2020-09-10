@@ -9,7 +9,7 @@
 library(RecordLinkage)
 library(tictoc)
 
-rl_dedup <- function(d, id = NA, bf = NA, excl = FALSE, thold){
+rl_dedup <- function(d, id = NA, bf = NA, excl = FALSE, thold = 20){
 	tic()
 	cat('Running compare.dedup:\n')
 	cat(paste('    Nrows:', nrow(d), '\n'))
@@ -18,13 +18,14 @@ rl_dedup <- function(d, id = NA, bf = NA, excl = FALSE, thold){
 			  paste(
 			  		sapply(bf, function(x) paste(x, collapse = '/')),
 			  		collapse = ' - '
-					), '\n\n`'))	
+					), '\n\n'))	
 	#-- do the comparison
 	rp <- compare.dedup(d,
 						blockfld = bf,
 						strcmp = TRUE,
 						identity = id,
-						exclude = excl)
+						exclude = excl
+						)
 	cat('Running emWeight')
 	#-- get emWeights
 	rpem <- emWeights(rp)
@@ -35,19 +36,28 @@ rl_dedup <- function(d, id = NA, bf = NA, excl = FALSE, thold){
 	} else {
 		res <- emClassify(rpem, thold[1], thold[2])
 	}
+	cat('Returned results:\n')
+	cat(paste('    nrow:', nrow(res$pairs), '\n'))
+	if(is.na(id[1])){
+		print(table(res$prediction))
+		cat('\n')
+	} else {
+		print(table(res$prediction, res$pairs$is_match))
+		cat('\n')
+	}
 	toc()
 	return(res)
 }
 
 generate_link_participant_table <- function(d, participant_detail_cols){
 	#-- pull out those with linkages
-	of_interest <- which(as.character(d$prediction) %in% c('P', 'L'))
-	links <- d$pairs[of_interest, c('id1', 'id2')]
-	links$link_type <- d$prediction[of_interest]
-	links$link_strength <- d$Wdata[of_interest]
+	links <- d$pairs[, which(colnames(d$pairs) %in% c('id1', 'id2', 'is_match'))]
+	links$link_type <- d$prediction
+	links$link_strength <- d$Wdata
+	links$link_rank <- rank(-links$link_strength, ties.method = 'min')
 	#-- merge in first participant data
-	out <- merge(links, d$data[,participant_detail_cols], by.x = 'id1', by.y = "row.names", all.x = T)
+	out <- merge(links, d$data[,participant_detail_cols], by.x = 'id1', by.y = "row.names", all.x = T, suffixes = c('.x', '.a'))
 	#-- merge in linked participant data
 	out <- merge(out, d$data[, participant_detail_cols], by.x = 'id2', by.y = "row.names", all.x = T, suffixes = c('.a', '.b'))
-	return(out)
+	return(out[order(out$link_strength, decreasing = TRUE), ])
 }
